@@ -1,0 +1,5 @@
+from "./keccak" import main as keccak;
+
+def main<N, M>(u8[N] input, u8[M] input1, u32 length) -> u8[32] {
+    return keccak::<_, _, 32>(input, input1, 0x01, length);
+}

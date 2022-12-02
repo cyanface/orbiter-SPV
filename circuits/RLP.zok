@@ -1,0 +1,147 @@
+from "./keccak/256bit" import main as keccak256 ;
+from "utils/casts" import cast;
+
+const u32 STRING_SHORT_START = 128;
+const u32 STRING_LONG_START = 183;
+const u32 LIST_SHORT_START = 192;
+const u32 LIST_LONG_START = 247;
+
+def u8tou32helper(u8 i) -> u32 {
+    u32 h = cast(i);
+    return h;
+}
+
+def u8dtou32helper(u8[2] i) -> u32 {
+    u16 h = cast(i);
+    u32 h1 = cast(h);
+    return h1;
+}
+
+def getLongRLPListItem<N>(u8[N] encoded, u8 listIndex) -> u8[32] {
+    u32 mut current = 0;
+    u32 mut currentLength = 0;
+    u32 mut startByteIndex = 0;
+    // u32 mut startByteLength = 0;
+    u8 mut currentIndex = 0;
+    u8[32] mut item = [0; 32];
+    u32 mut prefix = u8tou32helper(encoded[current]);
+    current = prefix - LIST_LONG_START + 1;
+    
+    for u32 i in 0..N {
+        prefix = if i == current {
+            u8tou32helper(encoded[i])
+        } else {
+            prefix
+        };
+        startByteIndex = if i == current {
+            if currentIndex == listIndex {
+                current + 1
+            } else {
+                startByteIndex
+            }
+        } else {
+            startByteIndex
+        };
+        currentLength = if i == current {
+            prefix - STRING_SHORT_START 
+        } else {
+            currentLength
+        };
+        currentIndex = if i == current {
+            currentIndex + 1
+        } else {
+            currentIndex
+        };
+        current = if i == current {
+            current + currentLength + 1
+        } else {
+            current
+        };
+    }
+
+    for u32 i in 0..32 {
+        item[i] = encoded[i+startByteIndex];
+    }
+
+    return item;
+}
+
+def getShortRLPListItem<N>(u8[N] encoded, u8 listIndex) -> u8[32] {
+    u32 mut current = 0;
+    u32 mut currentLength = 0;
+    u32 mut startByteIndex = 0;
+    // u32 mut startByteLength = 0;
+    u8 mut currentIndex = 0;
+    u8[32] mut item = [0; 32];
+    u32 mut prefix = u8tou32helper(encoded[current]);
+    current = prefix - LIST_LONG_START + 1;
+    
+    for u32 i in 0..N {
+        prefix = if i == current {
+            u8tou32helper(encoded[i])
+        } else {
+            prefix
+        };
+        startByteIndex = if i == current {
+            if currentIndex == listIndex {
+                current + 1
+            } else {
+                startByteIndex
+            }
+        } else {
+            startByteIndex
+        };
+        currentLength = if i == current {
+            prefix - STRING_SHORT_START 
+        } else {
+            currentLength
+        };
+        currentIndex = if i == current {
+            currentIndex + 1
+        } else {
+            currentIndex
+        };
+        current = if i == current {
+            current + currentLength + 1
+        } else {
+            current
+        };
+    }
+
+    for u32 i in 0..32 {
+        item[i] = encoded[i+startByteIndex];
+    }
+
+    return item;
+}
+
+def getRLPLeafItem<N>(u8[N] encoded) -> u8[32] {
+    
+    u8[32] mut item = [0; 32];
+    // u32 mut prefix = u8tou32helper(encoded[4]);
+    // prefix = prefix - STRING_LONG_START;
+    // prefix = 4 + prefix + 1;
+    
+    u32 n = N - 7;
+    item = keccak256::<n>(encoded[7..N]);
+    return item;
+}
+
+def checkroot<N>(u8[N] rootNode, u8[32] expectRoot) -> u8 {
+    u8[32] mut h = keccak256::<N>(rootNode);
+    assert(expectRoot == h);
+    return 1;
+}
+
+def checkleaf<N>(u8[N] leafnode, u8[32] expectLeaf) -> u8 {
+    u8[32] mut rlpNode = getRLPLeafItem(leafnode);
+    assert(rlpNode == expectLeaf);
+    return 1;
+}
+
+def checknode<N>(u8[N] encoded, u8 index, u8[32] expectNode) -> u8 {
+    // todo rather than LIST LONG START
+    u8[32] mut rlpNode = getLongRLPListItem(encoded, index);
+    assert(rlpNode == expectNode);
+    return 1;
+}

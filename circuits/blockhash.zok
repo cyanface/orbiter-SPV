@@ -1,0 +1,134 @@
+from "./keccaklimitedlength/256bit" import main as keccak256limitedlength ;
+from "./keccak/256bit" import main as keccak256 ;
+from "utils/casts" import cast;
+
+const u32 BATCH_NUM = 10;
+
+const u8[32] EMPTYU832 = [0;32];
+
+def u8dtou32helper(u8[2] i) -> u32 {
+    u16 h = cast(i);
+    u32 h1 = cast(h);
+    return h1;
+}
+
+def hashpair(u8[32] a, u8[32] b) -> u8[32] {
+    u8 mut res = 0;
+    for u32 i in 0..32 {
+        res = if res == 0 {
+            if a[i] == b[i] {
+                res
+            } else {
+                if a[i] < b[i] {
+                    1
+                } else {
+                    2
+                }
+            }
+        } else {
+            res
+        };
+    }
+
+    u8[64] mut ab = [0; 64];
+    for u32 i in 0..64 {
+        ab[i] = if res == 1 {
+            if i < 32 {
+                a[i]
+            } else {
+                b[i-32]
+            }
+        } else {
+            if i < 32 {
+                b[i]
+            } else {
+                a[i-32]
+            }
+        };
+    }
+
+    log("ab is {}", ab);
+    log("res is {}", res);
+    u8[32] mut h = keccak256::<64>(ab);
+    return h;
+}
+
+def mptverify4(u8[32] root, u8[32] leaf, u8[4][32] proofs) -> u8 {
+    // Start from the leaf
+    u8[32] mut digest = leaf;
+
+	// Loop up the tree
+	for u32 i in 0..4 {
+        log("i is {}", i);
+        log("digest before is {}",digest);
+		digest = hashpair(digest, proofs[i]);
+        log("digest after is {}",digest);
+	}
+
+    assert (digest == root);
+    return 1;
+}
+
+def mptverify3(u8[32] root, u8[32] leaf, u8[4][32] proofs) -> u8 {
+    // Start from the leaf
+    u8[32] mut digest = leaf;
+
+	// Loop up the tree
+	for u32 i in 0..3 {
+		digest = hashpair(digest, proofs[i]);
+	}
+
+    assert (digest == root);
+    return 1;
+}
+
+def getParentHash(u8[550] blockrlp) -> u8[32] {
+    u8[32] mut h = blockrlp[4..36];
+    return h;
+}
+
+def rlpHash(u8[550] blockrlp) -> u8[32] {
+    u32 length = u8dtou32helper([blockrlp[1], blockrlp[2]]) + 3 - 500;
+    u8[32] mut h = keccak256limitedlength::<500, 50>(blockrlp[0..500], blockrlp[500..550], length);
+    return h;
+}
+
+def main(u8[32] mut parentHash, private u8[BATCH_NUM][550] blockrlps, private u8[BATCH_NUM][4][32] mptproofs, u8[32] root) -> u8[32] {
+    u8[32] mut inBlockParentHash = [0;32];
+    u8[32] mut leaf = [0;32];
+    for u32 i in 0..BATCH_NUM {
+        inBlockParentHash = getParentHash(blockrlps[i]);
+        assert(parentHash == inBlockParentHash);
+        parentHash = rlpHash(blockrlps[i]);
+        leaf = keccak256::<32>(parentHash);
+        leaf = keccak256::<32>(leaf);
+        u8 mut res = if mptproofs[i][3] == EMPTYU832 {
+            mptverify3(root, leaf, mptproofs[i])
+        } else {
+            mptverify4(root, leaf, mptproofs[i])
+        };
+        assert(res == 1);   
+    }
+    return parentHash;
+}
+
+// def main(u8[550] blockrlp) -> u8[32] {
+//     u32 length = u8dtou32helper([blockrlp[1], blockrlp[2]]) + 3 - 500;
+//     u8[32] mut h = keccak256limitedlength::<500, 50>(blockrlp[0..500], blockrlp[500..550], length);
+//     log("block hash hash is {}", h);
+
+//     u8[32] mut h = getParentHash(blockrlp);
+//     log("parent hash is {}", h);
+//     return h;
+// }
+
+// test check custom mpt
+// def main(u8[4][32] mptproofs, u8[32] root, u8[32] leaf) -> u8 {
+//     u8 mut res = if mptproofs[3] == EMPTYU832 {
+//          mptverify4(root, leaf, mptproofs)
+//     } else {
+//          mptverify3(root, leaf, mptproofs)
+//     };
+//     assert(res == 1);
+//     return 1;
+// }

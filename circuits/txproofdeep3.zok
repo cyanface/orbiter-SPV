@@ -1,0 +1,14 @@
+from "./keccak/256bit" import main as keccak256 ;
+from "utils/casts" import cast;
+from "./RLP" import checkroot, checknode, checkleaf;
+
+def main(u8[32] expectRoot, u8[32] expectLeaf, private u8[308] proof1, private u8[500] proof2, private u8[500] proof3, private u8[2] mptIndexes) -> u8 {
+    u8 mut res = checkroot(proof1, expectRoot);
+    res = checknode(proof1, mptIndexes[0], keccak256::<500>(proof2));
+    assert(res == 1);
+    res = checknode(proof2, mptIndexes[1], keccak256::<500>(proof3));
+    assert(res == 1);
+    res = checkleaf(proof3, expectLeaf);
+    assert(res == 1);
+    return 1;
+}
